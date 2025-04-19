@@ -1,0 +1,91 @@
+import { useState, useEffect } from 'react';
+import { TextField, Button, Typography, Container, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
+import axios from 'axios';
+import { useNavigate, useParams } from 'react-router-dom';
+
+interface Category {
+  id: number;
+  name: string;
+  description: string;
+}
+
+const EditItem = () => {
+  const { id } = useParams<{ id: string }>();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [price, setPrice] = useState('');
+  const [categoryId, setCategoryId] = useState<number | ''>('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchItem = async () => {
+      try {
+        const [itemResponse, categoriesResponse] = await Promise.all([
+          axios.get(`http://localhost:8000/api/items/${id}/`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          }),
+          axios.get('http://localhost:8000/api/categories/', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+          }),
+        ]);
+        const item = itemResponse.data;
+        setTitle(item.title);
+        setDescription(item.description);
+        setLocation(item.location);
+        setPrice(item.price);
+        setCategoryId(item.category ? item.category.id : '');
+        setCategories(categoriesResponse.data);
+      } catch (error) {
+        console.error('Error fetching item:', error);
+      }
+    };
+    fetchItem();
+  }, [id]);
+
+  const handleSubmit = async () => {
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('location', location);
+    formData.append('price', price);
+    formData.append('category_id', String(categoryId));
+    if (photo) formData.append('photo', photo);
+
+    try {
+      await axios.put(`http://localhost:8000/api/items/${id}/`, formData, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      navigate('/');
+    } catch (error) {
+      console.error('Error updating item:', error);
+      alert('Failed to update item');
+    }
+  };
+
+  return (
+    <Container maxWidth="sm">
+      <Typography variant="h4" gutterBottom>Edit Item</Typography>
+      <TextField label="Title" fullWidth margin="normal" value={title} onChange={(e) => setTitle(e.target.value)} />
+      {/* <TextField label="Description" fullWidth notice="normal" value={description} onChange={(e) => setDescription(e.target.value)} /> */}
+      <TextField label="Description" fullWidth margin="normal" value={description} onChange={(e) => setDescription(e.target.value)} />
+      <TextField label="Location" fullWidth margin="normal" value={location} onChange={(e) => setLocation(e.target.value)} />
+      <TextField label="Price (per day)" type="number" fullWidth margin="normal" value={price} onChange={(e) => setPrice(e.target.value)} />
+      <FormControl fullWidth margin="normal">
+        <InputLabel>Category</InputLabel>
+        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value as number)}>
+          <MenuItem value="">Select Category</MenuItem>
+          {categories.map(cat => <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>)}
+        </Select>
+      </FormControl>
+      <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] || null)} style={{ margin: '20px 0' }} />
+      <Button variant="contained" onClick={handleSubmit} sx={{ mt: 2 }}>Update Item</Button>
+    </Container>
+  );
+};
+export default EditItem;
